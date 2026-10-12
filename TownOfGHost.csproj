@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <AssemblyName>TownOfGHost</AssemblyName>
+    <RootNamespace>HostRules</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <DebugType>embedded</DebugType>
+
+    <!-- Folder of your BepInEx COPY of Among Us (the one that contains Among Us.exe, BepInEx\core and BepInEx\interop).
+         Either edit this line or pass it on the command line:  dotnet build -c Release -p:AmongUsDir="D:\Games\Among Us BepInEx" -->
+    <AmongUsDir Condition="'$(AmongUsDir)' == ''">C:\PATH\TO\Among Us BepInEx</AmongUsDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="$(AmongUsDir)\BepInEx\core\*.dll" Private="false" />
+    <Reference Include="$(AmongUsDir)\BepInEx\interop\*.dll" Private="false" />
+  </ItemGroup>
+
+  <Target Name="CheckAmongUsDir" BeforeTargets="BeforeBuild" Condition="!Exists('$(AmongUsDir)\BepInEx\interop\Assembly-CSharp.dll')">
+    <Error Text="AmongUsDir is wrong: '$(AmongUsDir)\BepInEx\interop\Assembly-CSharp.dll' does not exist. Edit AmongUsDir in TownOfGHost.csproj or build with -p:AmongUsDir=&quot;...&quot;" />
+  </Target>
+
+  <!-- Copy the finished plugin into BepInEx\plugins automatically. -->
+  <Target Name="CopyToPlugins" AfterTargets="Build" Condition="Exists('$(AmongUsDir)\BepInEx\plugins')">
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(AmongUsDir)\BepInEx\plugins" />
+    <Message Importance="high" Text="TownOfGHost.dll copied to $(AmongUsDir)\BepInEx\plugins" />
+  </Target>
+
+</Project>
