@@ -109,9 +109,4 @@ Type them in the chat. Only you, the host, can use them, and they are never sent
    ```
    `TownOfGHost.dll` is copied into `BepInEx\plugins` automatically.
 
----
 
-## Troubleshooting
-
-- **Something went wrong?** Send `BepInEx\LogOutput.log`. Don't share the large console log: it contains account identifiers.
-- **Kicked when hosting?** Look for `[net] disconnect` lines in `LogOutput.log`.
