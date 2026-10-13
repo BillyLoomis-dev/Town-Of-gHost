@@ -15,6 +15,11 @@
     <AmongUsDir Condition="'$(AmongUsDir)' == ''">C:\PATH\TO\Among Us BepInEx</AmongUsDir>
   </PropertyGroup>
 
+  <!-- Town of gHost pictures (loading screen and main menu banner), built into the DLL. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\*.png;Resources\*.jpg" LogicalName="TownOfGHost.Resources.%(Filename)%(Extension)" />
+  </ItemGroup>
+
   <ItemGroup>
     <Reference Include="$(AmongUsDir)\BepInEx\core\*.dll" Private="false" />
     <Reference Include="$(AmongUsDir)\BepInEx\interop\*.dll" Private="false" />

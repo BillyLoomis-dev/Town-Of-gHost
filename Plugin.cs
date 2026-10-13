@@ -20,7 +20,7 @@ namespace HostRules
     public class Plugin : BasePlugin
     {
         public const string Id = "local.townofghost";
-        public const string Version = "2.6.1";
+        public const string Version = "2.7.0";
 
         internal static ManualLogSource L;
 
@@ -43,6 +43,9 @@ namespace HostRules
         internal static ConfigEntry<float> VisionMax;
         internal static ConfigEntry<bool> LobbyKeepAlive;
         internal static ConfigEntry<float> LobbyKeepAliveMaxMinutes;
+        internal static ConfigEntry<bool> ShowLoadingPicture;
+        internal static ConfigEntry<bool> ShowMenuBanner;
+        internal static ConfigEntry<bool> ShowCornerInfo;
 
         // Feature switches: in memory only, OFF every time a new lobby is created, kept on between games of the same lobby.
         internal static readonly Flag TimeLimitEnabled = new Flag();
@@ -100,6 +103,13 @@ namespace HostRules
                 "When the server warns that the lobby is about to close for inactivity, accept the extension automatically (the game's own 'extend' feature). The server decides how many extensions it offers.");
             LobbyKeepAliveMaxMinutes = Config.Bind("Lobby", "LobbyKeepAliveMaxMinutes", 0f,
                 "Stop extending after the lobby has been waiting this many minutes. 0 = unlimited (keep extending as long as the server offers).");
+
+            ShowLoadingPicture = Config.Bind("Look", "ShowLoadingPicture", true,
+                "Show the Town of gHost picture while the game loads (after the Innersloth logo, at least 3 seconds; click to skip). Not shown when another mod has its own loading screen.");
+            ShowMenuBanner = Config.Bind("Look", "ShowMenuBanner", true,
+                "Show the Town of gHost banner in place of the Among Us logo in the main menu. Not shown when another mod already puts its own logo there.");
+            ShowCornerInfo = Config.Bind("Look", "ShowCornerInfo", true,
+                "Show 'Town of gHost' with its version and website in the top-right corner, under the ping (lobby and games, only on your screen).");
 
             ConsoleGuard.Start();
             new Harmony(Id).PatchAll();

@@ -12,16 +12,17 @@ It brings the ranked-mode settings into private lobbies — a task time limit fo
 
 ## Download
 
-Get both files from the **[Releases](../../releases)** page:
+Get them from the **[Releases](../../releases)** page:
 
 | File | What it is |
 |---|---|
-| **Town_Of_gHost.rar** | **Steam version** — ready to play. Extract and start the game. |
-| **Town_Of_gHost.zip** | **Source code** — for building the mod yourself. |
+| **Town.Of.gHost.zip** | **Steam version** — ready to play. Extract and start the game. |
+| **TownOfGHost.dll** | The plugin only, if you already have BepInEx 6 (IL2CPP) installed: put it in `BepInEx\plugins`. |
+| **Source code (zip)** | **Source code** — for building the mod yourself. |
 
 ### Install (Steam version)
 1. In Steam: right-click **Among Us → Manage → Browse local files**.
-2. Extract **Town_Of_gHost.rar** into that folder, next to `Among Us.exe`.
+2. Extract **Town.Of.gHost.zip** into that folder, next to `Among Us.exe`.
 3. Start the game. The **first launch is slower** while BepInEx sets itself up; after that it is normal.
 4. Create a lobby and type **`/help`** in the chat.
 
@@ -42,6 +43,7 @@ After an Among Us update the mod must be rebuilt for the new version.
 - **Impostor secret chat** — impostors talk privately in meetings. Only impostors and dead players can read it.
 - **Lobby keep-alive** — automatically accepts the server's "extend lobby" offer so the lobby isn't closed for inactivity.
 - **Everything is announced** — every rule change is posted in the lobby chat for everyone.
+- **Town of gHost look** — the Town of gHost picture while the game loads (click to skip), the Town of gHost banner in the main menu, and the mod's name, version and website in the top-right corner under the ping. Only on your screen.
 
 Everything is **OFF** in a new lobby. Your choices **stay on after each game** until you leave the lobby.
 
@@ -96,6 +98,11 @@ Type them in the chat. Only you, the host, can use them, and they are never sent
 | Vision | `VisionMax` | 0.5 | Highest vision `/vision` allows. |
 | Lobby | `LobbyKeepAlive` | true | Auto-accept the server's lobby extension. |
 | Lobby | `LobbyKeepAliveMaxMinutes` | 0 | Stop extending after this many minutes. 0 = unlimited (as long as the server offers). |
+| Look | `ShowLoadingPicture` | true | Show the Town of gHost picture while the game loads. |
+| Look | `ShowMenuBanner` | true | Show the Town of gHost banner in the main menu. |
+| Look | `ShowCornerInfo` | true | Show the mod's name, version and website in the top-right corner. |
+
+If another mod with its own loading screen, menu logo or corner text is installed too (for example GreaterAmongUs), that mod's are shown instead.
 
 ---
 
@@ -108,5 +115,6 @@ Type them in the chat. Only you, the host, can use them, and they are never sent
    dotnet build -c Release -p:AmongUsDir="C:\path\to\your\Among Us"
    ```
    `TownOfGHost.dll` is copied into `BepInEx\plugins` automatically.
+4. Or run **`make-package.bat`** (Windows): it builds the plugin and makes the ready-to-play zip (BepInEx + the plugin) next to it.
 
 
