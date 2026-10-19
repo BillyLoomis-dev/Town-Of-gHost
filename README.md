@@ -85,7 +85,7 @@ Type them in the chat. Only you, the host, can use them, and they are never sent
 | Section | Setting | Default | What it does |
 |---|---|---|---|
 | General | `Enabled` | true | Master switch. The mod only acts while you host an online lobby. |
-| General | `CloseConsoleAfterSeconds` | 3 | Close the console this many seconds after launch. -1 = never. |
+| General | `CloseConsoleAfterSeconds` | 3 | Close the console this many seconds after launch, and keep BepInEx's console off from the next launch (no window at all). -1 = keep the console (for debugging). |
 | General | `CloseConsoleWhenHosting` | true | Also close the console when you create a lobby. |
 | Network | `RegisterHostOnlyFlag` | true | Innersloth's host-only mod flag. Needed for the game end and the impostor chat. |
 | Timer | `TimeLimitMinutes` | 18 | Minutes for the time limit (also changed by `/time X`). |

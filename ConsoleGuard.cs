@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 using BepInEx;
 
@@ -14,11 +15,20 @@ namespace HostRules
     // Backups: every frame from the game's own update, and the moment you create a lobby (CloseConsoleWhenHosting).
     // Each attempt uses BepInEx's own detach first and then plain Windows calls, so it works even if BepInEx's own state
     // is out of step with the real window.
+    //
+    // Windows Terminal: when Windows opens console windows in Windows Terminal (the default on Windows 11), detaching
+    // often leaves that window open, frozen at the startup lines. It can't be closed safely from here (it could close the
+    // player's other tabs). So BepInEx's own console is switched off in BepInEx's settings: from the next launch on
+    // no console window opens at all. CloseConsoleAfterSeconds = -1 turns it back on (for debugging).
     internal static class ConsoleGuard
     {
         [DllImport("kernel32.dll")] private static extern IntPtr GetConsoleWindow();
         [DllImport("kernel32.dll")] private static extern bool FreeConsole();
         [DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetClassName(IntPtr hWnd, StringBuilder name, int max);
+
+        // Class of the hidden window Windows Terminal puts behind a console it hosts.
+        private const string TerminalHostedClass = "PseudoConsoleWindow";
 
         private static readonly object Gate = new object();
         private static volatile bool _closed;
@@ -29,6 +39,7 @@ namespace HostRules
         public static void Start()
         {
             _start = DateTime.UtcNow;
+            SetBepInExConsole(Plugin.CloseConsoleAfterSeconds.Value < 0f);
             if (Plugin.CloseConsoleAfterSeconds.Value < 0f) return;
 
             var thread = new Thread(Loop) { IsBackground = true, Name = "TownOfGHost-console" };
@@ -78,11 +89,47 @@ namespace HostRules
             TryClose("lobby is being created");
         }
 
+        // BepInEx's own "open a console window" setting (BepInEx\config\BepInEx.cfg, [Logging.Console] Enabled).
+        // It is read when the game starts, so a change counts from the next launch.
+        private static void SetBepInExConsole(bool on)
+        {
+            try
+            {
+                var entry = ConsoleManager.ConfigConsoleEnabled;
+                if (entry == null || entry.Value == on) return;
+                entry.Value = on;
+                Plugin.L.LogInfo(on
+                    ? "[console] BepInEx's console is turned back on from the next launch (CloseConsoleAfterSeconds = -1)"
+                    : "[console] BepInEx's console is switched off from the next launch: no console window will open. Logs still go to LogOutput.log");
+            }
+            catch (Exception e)
+            {
+                Plugin.L.LogWarning("[console] could not change BepInEx's console setting: " + e.Message);
+            }
+        }
+
+        private static bool IsInWindowsTerminal(IntPtr window)
+        {
+            if (window == IntPtr.Zero) return false;
+            try
+            {
+                var name = new StringBuilder(64);
+                return GetClassName(window, name, name.Capacity) > 0 && name.ToString() == TerminalHostedClass;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
         private static void TryClose(string why)
         {
             lock (Gate)
             {
                 if (_closed) return;
+
+                // Checked before detaching: afterwards the window can't be asked any more.
+                bool inTerminal = IsInWindowsTerminal(GetConsoleWindow());
 
                 // 1) BepInEx's own way
                 try
@@ -105,7 +152,10 @@ namespace HostRules
                     if (window == IntPtr.Zero)
                     {
                         _closed = true;
-                        _note = "console window closed (" + why + "). Logs still go to LogOutput.log";
+                        _note = inTerminal
+                            ? "detached from the console (" + why + "). It is a Windows Terminal window, which Windows may keep open this time; "
+                              + "from the next launch no console opens at all. Logs still go to LogOutput.log"
+                            : "console window closed (" + why + "). Logs still go to LogOutput.log";
                     }
                 }
                 catch (Exception e)

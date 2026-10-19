@@ -21,7 +21,7 @@ namespace HostRules
     public class Plugin : BasePlugin
     {
         public const string Id = "local.townofghost";
-        public const string Version = "2.8.0";
+        public const string Version = "2.8.1";
 
         internal static ManualLogSource L;
 
@@ -68,7 +68,9 @@ namespace HostRules
             Enabled = Config.Bind("General", "Enabled", true,
                 "Master switch. Everything in this plugin only ever acts while YOU are the host of an online lobby.");
             CloseConsoleAfterSeconds = Config.Bind("General", "CloseConsoleAfterSeconds", 3f,
-                "Close the BepInEx console window this many seconds after the plugin loads (at most 4; it keeps retrying until about 9 seconds), to protect live information. -1 = never close it automatically. Logs still go to LogOutput.log.");
+                "Close the BepInEx console window this many seconds after the plugin loads (at most 4; it keeps retrying until about 9 seconds), to protect live information. "
+                + "BepInEx's console is also switched off for the following launches, so no window opens at all. "
+                + "-1 = keep the console (it opens normally again from the next launch), for debugging. Logs always go to LogOutput.log.");
             CloseConsoleWhenHosting = Config.Bind("General", "CloseConsoleWhenHosting", true,
                 "Close the BepInEx console window as soon as you create a lobby, to protect live information (lobby code, player info). Logs still go to LogOutput.log. Set to false when you need the console for debugging.");
             RegisterHostOnlyFlag = Config.Bind("Network", "RegisterHostOnlyFlag", true,
