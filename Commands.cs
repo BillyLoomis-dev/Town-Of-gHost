@@ -44,6 +44,7 @@ namespace HostRules
             if (IsWord(text, "/settings")) { Announce(Rules.SettingsLines()); return true; }
             if (IsWord(text, "/time")) { Time(me, Arg(text, "/time")); return true; }
             if (IsWord(text, "/vision")) { Vision(me, Arg(text, "/vision")); return true; }
+            if (IsWord(text, "/lightvision")) { LightVision(me, Arg(text, "/lightvision")); return true; }
             if (IsWord(text, "/jester")) { Switch(me, "/jester", Arg(text, "/jester"), Plugin.JesterEnabled, Rules.JesterLines); return true; }
             if (IsWord(text, "/impchat")) { Switch(me, "/impchat", Arg(text, "/impchat"), Plugin.ImpostorChatEnabled, Rules.ImpChatLines); return true; }
 
@@ -68,11 +69,12 @@ namespace HostRules
             Local(me, "Host commands (only you see this list). Everything is OFF in a new lobby and stays as you set it after a game:");
             Local(me, "/time on | /time off - the tasks time limit.  /time 18 sets the minutes (and turns it on).");
             Local(me, "/time pause on | off - should meetings pause the time limit clock.");
-            Local(me, "/vision 0.15 - crew vision (" + Rules.Num(Plugin.VisionMin.Value) + "-" + Rules.Num(Plugin.VisionMax.Value) + ").  /vision off - back to normal.");
+            Local(me, "/vision 0.15 - crew vision (" + Range() + ", 0 = pitch black).  /vision off - back to normal.");
+            Local(me, "/lightvision 0.05 - crew vision while the lights are out (" + Range() + "). Impostors keep full vision.  /lightvision off - normal.");
             Local(me, "/jester on | off - one random crewmate is the Jester and wins by getting voted out.");
             Local(me, "/impchat on | off - private impostor chat. Impostors type /cmd message; you type // message if you are an impostor.");
             Local(me, "/settings - post the rules that are ON in the chat for everyone.  /help - this list.");
-            Local(me, "/time, /vision, /jester and /impchat only work in the lobby. Every change is announced to everyone.");
+            Local(me, "/time, /vision, /lightvision, /jester and /impchat only work in the lobby. Every change is announced to everyone.");
         }
 
         // ---------------------------------------------------------------- /time
@@ -124,7 +126,7 @@ namespace HostRules
         // ---------------------------------------------------------------- /vision
         private static void Vision(PlayerControl me, string arg)
         {
-            float lo = Plugin.VisionMin.Value, hi = Plugin.VisionMax.Value;
+            float lo = Lowest(), hi = Plugin.VisionMax.Value;
 
             if (arg.Length == 0)
             {
@@ -161,6 +163,59 @@ namespace HostRules
             VisionOverride.Set(clamped);
             if (Math.Abs(clamped - v) > 0.0001) Local(me, "(allowed range is " + Rules.Num(lo) + "-" + Rules.Num(hi) + ")");
             Announce(Rules.VisionLines());
+        }
+
+        // ---------------------------------------------------------------- /lightvision
+        private static void LightVision(PlayerControl me, string arg)
+        {
+            float lo = Lowest(), hi = Plugin.VisionMax.Value;
+
+            if (arg.Length == 0)
+            {
+                foreach (var l in Rules.LightVisionLines()) Local(me, l);
+                Local(me, "Usage: /lightvision 0.05 (allowed " + Range() + ", 0 = pitch black), or /lightvision off");
+                return;
+            }
+            if (!Gate.InLobby())
+            {
+                Local(me, "/lightvision only works in the lobby, before the game starts.");
+                return;
+            }
+            if (!VisionOverride.Available)
+            {
+                Local(me, "/lightvision only works in Classic mode.");
+                return;
+            }
+
+            if (arg.Equals("off", StringComparison.OrdinalIgnoreCase) || arg.Equals("reset", StringComparison.OrdinalIgnoreCase))
+            {
+                VisionOverride.ClearLight();
+                Announce(Rules.LightVisionLines());
+                return;
+            }
+
+            double v;
+            if (!TryNum(arg, out v))
+            {
+                Local(me, "Usage: /lightvision 0.05   (or /lightvision off)");
+                return;
+            }
+
+            var clamped = (float)Math.Min(hi, Math.Max(lo, v));
+            VisionOverride.SetLight(clamped);
+            if (Math.Abs(clamped - v) > 0.0001) Local(me, "(allowed range is " + Range() + ")");
+            Announce(Rules.LightVisionLines());
+        }
+
+        // Lowest vision allowed by the settings file (never below 0).
+        private static float Lowest()
+        {
+            return Math.Max(0f, Plugin.VisionMin.Value);
+        }
+
+        private static string Range()
+        {
+            return Rules.Num(Lowest()) + "-" + Rules.Num(Plugin.VisionMax.Value);
         }
 
         // ---------------------------------------------------------------- /jester and /impchat (plain on/off switches)

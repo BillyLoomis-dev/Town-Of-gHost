@@ -266,7 +266,12 @@ namespace HostRules
     {
         public static void Prefix()
         {
-            try { if (Gate.ActiveHost()) VisionOverride.ReassertAndSync(); }
+            try
+            {
+                if (!Gate.ActiveHost()) return;
+                VisionOverride.OnGameStart();
+                VisionOverride.ReassertAndSync();
+            }
             catch (Exception e) { Plugin.L.LogError("[vision] " + e); }
         }
     }
@@ -348,7 +353,7 @@ namespace HostRules
             try
             {
                 if (!Gate.ActiveHost()) return;
-                Jester.OnVotingComplete(exiled);
+                Jester.OnVotingComplete(exiled, JudgeRules.JestersOwnOverrule);
             }
             catch (Exception e) { Plugin.L.LogError("[jester] " + e); }
         }
@@ -506,6 +511,38 @@ namespace HostRules
         }
     }
 
+    // Every way the game can end a round goes through RpcEndGame (Impostor majority, sabotage, tasks, our time limit).
+    //  - Once the Jester has been voted out, any ending is turned into his win. This matters when voting him out
+    //    leaves as many Impostors as crewmates: the game then wants to end the round at once as an Impostor win,
+    //    and on some maps (Airship) the ejection scene finishes without the moment the Jester's win normally starts.
+    //  - While the Jester's win is being shown, any other ending is held back.
+    [HarmonyPatch(typeof(GameManager), nameof(GameManager.RpcEndGame))]
+    internal static class Patch_EndGameGuard
+    {
+        public static bool Prefix(GameOverReason endReason)
+        {
+            try
+            {
+                if (!Gate.ActiveHost() || JesterWin.EndingNow) return true;
+
+                if (JesterWin.Running)
+                {
+                    Plugin.L.LogInfo("[jester] another ending (" + endReason + ") was held back - the Jester's win is being shown");
+                    return false;
+                }
+
+                if (Jester.EjectionPending)
+                {
+                    Plugin.L.LogInfo("[jester] the game tried to end the round (" + endReason + ") after the Jester was voted out - it is the Jester's win");
+                    Jester.TryEndGame();
+                    return false;
+                }
+            }
+            catch (Exception e) { Plugin.L.LogError("[jester] " + e); }
+            return true;
+        }
+    }
+
     // ---------------------------------------------------------------- lobby keep-alive
 
     [HarmonyPatch(typeof(LobbyBehaviour), nameof(LobbyBehaviour.Start))]
@@ -515,6 +552,8 @@ namespace HostRules
         {
             try { LobbyKeepAlive.OnLobbyStart(); }
             catch (Exception e) { Plugin.L.LogError("[lobby] " + e); }
+            try { if (Gate.ActiveHost()) VisionOverride.OnLobbyStart(); }
+            catch (Exception e) { Plugin.L.LogError("[vision] " + e); }
         }
     }
 
@@ -553,6 +592,7 @@ namespace HostRules
             {
                 if (!Gate.ActiveHost()) return;
                 TaskTimer.Tick();
+                VisionOverride.TickLights();
                 Jester.Tick();
                 ChatLine.Pump();
                 Reveal.Tick();
@@ -571,6 +611,7 @@ namespace HostRules
             {
                 TaskTimer.Reset();
                 JesterWin.Reset();
+                VisionOverride.OnGameEnd();
                 if (Gate.ActiveHost()) Jester.OnRoundEnd(); else Jester.Reset();
                 ImpostorChat.Reset();
             }

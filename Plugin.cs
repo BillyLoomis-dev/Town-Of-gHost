@@ -1,3 +1,4 @@
+using System;
 using BepInEx;
 using BepInEx.Configuration;
 using BepInEx.Logging;
@@ -20,7 +21,7 @@ namespace HostRules
     public class Plugin : BasePlugin
     {
         public const string Id = "local.townofghost";
-        public const string Version = "2.7.0";
+        public const string Version = "2.8.0";
 
         internal static ManualLogSource L;
 
@@ -41,6 +42,7 @@ namespace HostRules
         internal static ConfigEntry<float> JesterBadgeOffset;
         internal static ConfigEntry<float> VisionMin;
         internal static ConfigEntry<float> VisionMax;
+        internal static ConfigEntry<int> SettingsVersion;
         internal static ConfigEntry<bool> LobbyKeepAlive;
         internal static ConfigEntry<float> LobbyKeepAliveMaxMinutes;
         internal static ConfigEntry<bool> ShowLoadingPicture;
@@ -96,8 +98,8 @@ namespace HostRules
             JesterBadgeOffset = Config.Bind("Jester", "BigJOffsetEm", -9f,
                 "How far the big 'J' is moved down from the name line (in name-line heights; more negative = lower). Aim for the middle of the body.");
 
-            VisionMin = Config.Bind("Vision", "VisionMin", 0.05f, "Lowest crewmate vision the host can set with /vision.");
-            VisionMax = Config.Bind("Vision", "VisionMax", 0.5f, "Highest crewmate vision the host can set with /vision.");
+            VisionMin = Config.Bind("Vision", "VisionMin", 0f, "Lowest crewmate vision the host can set with /vision and /lightvision. 0 = pitch black.");
+            VisionMax = Config.Bind("Vision", "VisionMax", 0.5f, "Highest crewmate vision the host can set with /vision and /lightvision.");
 
             LobbyKeepAlive = Config.Bind("Lobby", "LobbyKeepAlive", true,
                 "When the server warns that the lobby is about to close for inactivity, accept the extension automatically (the game's own 'extend' feature). The server decides how many extensions it offers.");
@@ -110,6 +112,16 @@ namespace HostRules
                 "Show the Town of gHost banner in place of the Among Us logo in the main menu. Not shown when another mod already puts its own logo there.");
             ShowCornerInfo = Config.Bind("Look", "ShowCornerInfo", true,
                 "Show 'Town of gHost' with its version and website in the top-right corner, under the ping (lobby and games, only on your screen).");
+
+            // One-time updates of settings files made by older versions.
+            SettingsVersion = Config.Bind("General", "SettingsVersion", 0,
+                "Used by Town of gHost to update settings from older versions once. Don't change it.");
+            if (SettingsVersion.Value < 280)
+            {
+                // 2.8.0: vision can go down to 0. Move the old default (0.05) along; a value you chose stays.
+                if (Math.Abs(VisionMin.Value - 0.05f) < 0.0001f) VisionMin.Value = 0f;
+                SettingsVersion.Value = 280;
+            }
 
             ConsoleGuard.Start();
             new Harmony(Id).PatchAll();

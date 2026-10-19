@@ -37,6 +37,7 @@ namespace HostRules
             l.Add("The Jester's tasks are fake: they never count toward the crew's task win.");
             l.Add("The Jester sees \"Jester\" above his head and a big J on his body.");
             l.Add("After a Jester win, the colors of the Jester and the Impostors are posted in the lobby chat.");
+            l.Add("Judge: overruling the Jester ejects HIM (he wins). The Jester can't win by his own overrule.");
             return l;
         }
 
@@ -62,8 +63,26 @@ namespace HostRules
                 l.Add("Crew vision: default.");
                 return l;
             }
-            l.Add("Crew vision: " + Num(v.Value) + "x (normal vision is 1x).");
+            l.Add("Crew vision: " + VisionText(v.Value) + " (normal vision is 1x).");
             return l;
+        }
+
+        public static List<string> LightVisionLines()
+        {
+            var l = new List<string>();
+            var v = VisionOverride.LightValue;
+            if (!v.HasValue)
+            {
+                l.Add("Crew vision when the lights are out: default.");
+                return l;
+            }
+            l.Add("Crew vision when the lights are out: " + VisionText(v.Value) + ". Impostors keep full vision.");
+            return l;
+        }
+
+        private static string VisionText(float v)
+        {
+            return v <= 0f ? "0x (pitch black)" : Num(v) + "x";
         }
 
         // Only the rules that are switched on, with all their details.
@@ -74,6 +93,7 @@ namespace HostRules
             if (Plugin.JesterEnabled.Value) body.AddRange(JesterLines());
             if (Plugin.ImpostorChatEnabled.Value) body.AddRange(ImpChatLines());
             if (VisionOverride.Value.HasValue) body.AddRange(VisionLines());
+            if (VisionOverride.LightValue.HasValue) body.AddRange(LightVisionLines());
 
             var l = new List<string>();
             if (body.Count == 0)

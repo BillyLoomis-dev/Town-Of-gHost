@@ -13,6 +13,8 @@ namespace HostRules
     //  - He is picked when the intro starts and gets a private chat line telling him he is the Jester.
     //  - His tasks are fake: they never count toward the crew's task win (see TaskCount.cs).
     //  - If he is voted out, everyone's end screen shows him as the only winner (see JesterWin.cs).
+    //  - Judge (see JudgeRules.cs): a Judge who overrules the Jester ejects HIM (he wins); an ejection caused by the
+    //    Jester's own overrule (he is the Judge and judged a crewmate) never makes him win.
     internal static class Jester
     {
         private const string Label = "Jester";
@@ -57,6 +59,9 @@ namespace HostRules
         public static bool HostIsJester { get { return _active && _hostIsJester; } }
         public static bool IsJester(byte playerId) { return _active && playerId == _id; }
         public static byte JesterId { get { return _id; } }
+
+        // He was voted out and his win hasn't started yet (it starts once the ejection scene is over).
+        public static bool EjectionPending { get { return _active && _ejected; } }
 
         private static bool Debug { get { return Plugin.JesterDebugLog.Value; } }
 
@@ -184,14 +189,19 @@ namespace HostRules
             _nextResend = DateTime.UtcNow.AddSeconds(ResendSeconds);
         }
 
-        public static void OnVotingComplete(NetworkedPlayerInfo exiled)
+        // ownOverrule: this meeting result comes from the Jester's own Judge overrule.
+        public static void OnVotingComplete(NetworkedPlayerInfo exiled, bool ownOverrule)
         {
             if (!_active || exiled == null) return;
-            if (exiled.PlayerId == _id)
+            if (exiled.PlayerId != _id) return;
+
+            if (ownOverrule)
             {
-                _ejected = true;
-                Plugin.L.LogInfo("[jester] the Jester was voted out");
+                Plugin.L.LogInfo("[jester] the Jester was ejected by his own wrong overrule - no Jester win, the round goes on");
+                return;
             }
+            _ejected = true;
+            Plugin.L.LogInfo("[jester] the Jester was voted out");
         }
 
         // After the ejection scene: end the round.
@@ -208,35 +218,36 @@ namespace HostRules
             JesterWin.Begin(_id);
         }
 
-        // "Jester: Red Won" and "Impostors: Blue, Green", posted after the game.
+        // "Jester: Red Won" and "Impostors: Blue, Green (left)", posted after the game.
+        // Impostors who left the game are listed too, marked "(left)".
         private static string[] BuildReveal()
         {
             var lines = new System.Collections.Generic.List<string>();
-            var j = Find();
-            lines.Add("Jester: " + (j != null ? ColorOf(j) : "Unknown") + " Won");
+            var data = GameData.Instance;
+            var jd = data != null ? data.GetPlayerById(_id) : null;
+            lines.Add("Jester: " + ColorOf(jd) + " Won");
 
             var imps = new System.Collections.Generic.List<string>();
-            var all = PlayerControl.AllPlayerControls;
-            if (all != null)
+            if (data != null)
             {
-                for (int i = 0; i < all.Count; i++)
+                var players = data.AllPlayers;
+                for (int i = 0; i < players.Count; i++)
                 {
-                    var p = all[i];
-                    if (p == null) continue;
-                    var d = p.Data;
-                    if (d == null || d.Disconnected || d.Role == null || !d.Role.IsImpostor) continue;
-                    imps.Add(ColorOf(p));
+                    var d = players[i];
+                    if (d == null || d.PlayerId == _id || !Teams.IsImpostor(d)) continue;
+                    imps.Add(d.Disconnected ? ColorOf(d) + " (left)" : ColorOf(d));
                 }
             }
             if (imps.Count > 0) lines.Add("Impostors: " + string.Join(", ", imps.ToArray()));
             return lines.ToArray();
         }
 
-        private static string ColorOf(PlayerControl p)
+        private static string ColorOf(NetworkedPlayerInfo d)
         {
             try
             {
-                var name = Palette.GetColorName(p.Data.DefaultOutfit.ColorId);
+                if (d == null) return "Unknown";
+                var name = Palette.GetColorName(d.DefaultOutfit.ColorId);
                 return string.IsNullOrEmpty(name) ? "Unknown" : name;
             }
             catch (Exception)

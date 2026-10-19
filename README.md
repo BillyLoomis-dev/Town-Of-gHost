@@ -35,11 +35,13 @@ After an Among Us update the mod must be rebuilt for the new version.
 - **Ranked task time limit** — the crew must finish all tasks in time or the Impostor team wins (default 18 minutes).
 - **Time left in every meeting** — "Tasks time left M:SS" is posted in the chat when a meeting starts.
 - **Pause or no pause** — choose whether meetings stop the clock. If time runs out during a meeting, the loss is applied right **after** that meeting, so the crew can still win the vote.
-- **Lowest vision ever played** — crewmate vision down to **0.05x**, far below the game's own minimum.
+- **Lowest vision ever played** — crewmate vision down to **0x (pitch black)**, far below the game's own minimum.
+- **Lights-out vision** — choose how far crewmates see while the lights are sabotaged, separately from their normal vision. Impostors always keep full vision.
 - **Jester** — a third team of one. One random crewmate is secretly the Jester and **wins by getting voted out**.
   - He sees **"Jester"** above his head and a **big J on his body** (still visible at the lowest vision). Nobody else sees it.
   - His tasks are **fake**: they never count toward the crew's task win.
-  - When he wins, **everyone's end screen** shows him as the only winner, and the lobby chat reveals the Jester's and the Impostors' colors.
+  - When he wins, **everyone's end screen** shows him as the only winner, and the lobby chat reveals the Jester's and the Impostors' colors (Impostors who left are listed too, marked "(left)").
+  - **Judge:** a Judge who overrules the Jester ejects **him** (he wins) instead of being ejected for a wrong judgment. If the Jester is the Judge, getting ejected by his own wrong overrule doesn't count as a win.
 - **Impostor secret chat** — impostors talk privately in meetings. Only impostors and dead players can read it.
 - **Lobby keep-alive** — automatically accepts the server's "extend lobby" offer so the lobby isn't closed for inactivity.
 - **Everything is announced** — every rule change is posted in the lobby chat for everyone.
@@ -60,12 +62,14 @@ Type them in the chat. Only you, the host, can use them, and they are never sent
 | `/time on` / `/time off` | Turns the tasks time limit on or off. |
 | `/time X` | Sets the time limit to X minutes (0.5–180) and turns it on. Example: `/time 18` |
 | `/time pause on` / `/time pause off` | Should meetings pause the clock? |
-| `/vision X` | Crewmate vision, from 0.05 to 0.5. Example: `/vision 0.05` |
+| `/vision X` | Crewmate vision, from 0 (pitch black) to 0.5. Example: `/vision 0.05` |
 | `/vision off` | Back to the vision set in the game's settings. |
+| `/lightvision X` | Crewmate vision while the lights are out, from 0 (pitch black) to 0.5. Impostors keep full vision. Example: `/lightvision 0.02` |
+| `/lightvision off` | Back to the game's own darkening when the lights are out. |
 | `/jester on` / `/jester off` | Turns the Jester on or off. |
 | `/impchat on` / `/impchat off` | Turns the impostor secret chat on or off. |
 
-`/time`, `/vision`, `/jester` and `/impchat` work in the lobby, before the game starts.
+`/time`, `/vision`, `/lightvision`, `/jester` and `/impchat` work in the lobby, before the game starts.
 
 ### Impostor secret chat
 - Impostors who are **not the host** type **`/cmd your message`** in a meeting.
@@ -94,8 +98,8 @@ Type them in the chat. Only you, the host, can use them, and they are never sent
 | Jester | `BigJOffsetEm` | -9 | Height of the big J (more negative = lower). |
 | Jester | `SendPlayerInfoId` | true | Technical; leave it on. |
 | Jester | `DebugLog` | false | Extra Jester logging. Can reveal the Jester — keep it off when playing. |
-| Vision | `VisionMin` | 0.05 | Lowest vision `/vision` allows. |
-| Vision | `VisionMax` | 0.5 | Highest vision `/vision` allows. |
+| Vision | `VisionMin` | 0 | Lowest vision `/vision` and `/lightvision` allow (0 = pitch black). |
+| Vision | `VisionMax` | 0.5 | Highest vision `/vision` and `/lightvision` allow. |
 | Lobby | `LobbyKeepAlive` | true | Auto-accept the server's lobby extension. |
 | Lobby | `LobbyKeepAliveMaxMinutes` | 0 | Stop extending after this many minutes. 0 = unlimited (as long as the server offers). |
 | Look | `ShowLoadingPicture` | true | Show the Town of gHost picture while the game loads. |
