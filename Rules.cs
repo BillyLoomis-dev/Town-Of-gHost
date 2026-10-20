@@ -54,6 +54,32 @@ namespace HostRules
             return l;
         }
 
+        public static List<string> CommsLines()
+        {
+            var l = new List<string>();
+            if (!Plugin.CommsCamoEnabled.Value)
+            {
+                l.Add("Comms camouflage: OFF.");
+                return l;
+            }
+            l.Add("Comms camouflage: ON. While comms is down, everyone is grey with no name, hat, skin or pet.");
+            l.Add("Names come back in meetings. Impostors still see each other's names. Bodies stay grey.");
+            l.Add("Everyone's real look comes back when comms is fixed.");
+            return l;
+        }
+
+        public static List<string> PetLines()
+        {
+            var l = new List<string>();
+            if (!Plugin.DeadPetRemovalEnabled.Value)
+            {
+                l.Add("Pets of dead players: normal.");
+                return l;
+            }
+            l.Add("Pets of dead players: removed. A pet disappears the moment its owner dies.");
+            return l;
+        }
+
         public static List<string> VisionLines()
         {
             var l = new List<string>();
@@ -92,6 +118,8 @@ namespace HostRules
             if (Plugin.TimeLimitEnabled.Value) body.AddRange(TimeLines());
             if (Plugin.JesterEnabled.Value) body.AddRange(JesterLines());
             if (Plugin.ImpostorChatEnabled.Value) body.AddRange(ImpChatLines());
+            if (Plugin.CommsCamoEnabled.Value) body.AddRange(CommsLines());
+            if (Plugin.DeadPetRemovalEnabled.Value) body.AddRange(PetLines());
             if (VisionOverride.Value.HasValue) body.AddRange(VisionLines());
             if (VisionOverride.LightValue.HasValue) body.AddRange(LightVisionLines());
 

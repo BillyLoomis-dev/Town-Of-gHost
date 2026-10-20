@@ -247,7 +247,7 @@ namespace HostRules
             try
             {
                 if (d == null) return "Unknown";
-                var name = Palette.GetColorName(d.DefaultOutfit.ColorId);
+                var name = Palette.GetColorName(CommsCamo.RealColor(d)); // the real color, also while comms has him grey
                 return string.IsNullOrEmpty(name) ? "Unknown" : name;
             }
             catch (Exception)
@@ -303,6 +303,12 @@ namespace HostRules
 
             _nextResend = now.AddSeconds(ResendSeconds);
             SetNameFor(j, TagText);
+        }
+
+        // Comms camouflage just sent everyone a name: put his private tag back shortly after, so it arrives last.
+        public static void ResendSoon()
+        {
+            _nextResend = DateTime.UtcNow.AddSeconds(0.25);
         }
 
         // Called for every player's fixed update: for the host-as-Jester this keeps the tag on after the game's own refresh.

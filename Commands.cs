@@ -47,6 +47,8 @@ namespace HostRules
             if (IsWord(text, "/lightvision")) { LightVision(me, Arg(text, "/lightvision")); return true; }
             if (IsWord(text, "/jester")) { Switch(me, "/jester", Arg(text, "/jester"), Plugin.JesterEnabled, Rules.JesterLines); return true; }
             if (IsWord(text, "/impchat")) { Switch(me, "/impchat", Arg(text, "/impchat"), Plugin.ImpostorChatEnabled, Rules.ImpChatLines); return true; }
+            if (IsWord(text, "/comms")) { Switch(me, "/comms", Arg(text, "/comms"), Plugin.CommsCamoEnabled, Rules.CommsLines); return true; }
+            if (IsWord(text, "/pet")) { Switch(me, "/pet", Arg(text, "/pet"), Plugin.DeadPetRemovalEnabled, Rules.PetLines); return true; }
 
             // Host as impostor: "// msg" (or "/cmd msg") goes to the impostor team only (when impostor chat is on).
             string secret = null;
@@ -73,8 +75,10 @@ namespace HostRules
             Local(me, "/lightvision 0.05 - crew vision while the lights are out (" + Range() + "). Impostors keep full vision.  /lightvision off - normal.");
             Local(me, "/jester on | off - one random crewmate is the Jester and wins by getting voted out.");
             Local(me, "/impchat on | off - private impostor chat. Impostors type /cmd message; you type // message if you are an impostor.");
+            Local(me, "/comms on | off - while comms is sabotaged everyone is grey with no name (impostors still see each other's names).");
+            Local(me, "/pet on | off - a player's pet disappears the moment he dies, so it can't stay by his body.");
             Local(me, "/settings - post the rules that are ON in the chat for everyone.  /help - this list.");
-            Local(me, "/time, /vision, /lightvision, /jester and /impchat only work in the lobby. Every change is announced to everyone.");
+            Local(me, "/time, /vision, /lightvision, /jester, /impchat, /comms and /pet only work in the lobby. Every change is announced to everyone.");
         }
 
         // ---------------------------------------------------------------- /time
@@ -218,7 +222,7 @@ namespace HostRules
             return Rules.Num(Lowest()) + "-" + Rules.Num(Plugin.VisionMax.Value);
         }
 
-        // ---------------------------------------------------------------- /jester and /impchat (plain on/off switches)
+        // ---------------------------------------------------------------- /jester, /impchat, /comms, /pet (plain on/off switches)
         private static void Switch(PlayerControl me, string cmd, string arg, Flag flag, Func<List<string>> lines)
         {
             if (arg.Length == 0)

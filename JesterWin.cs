@@ -43,6 +43,7 @@ namespace HostRules
         {
             if (Running) return;
             TaskTimer.Reset(); // the time limit must not end the game in the middle of this
+            CommsCamo.RestoreForEnd(); // real looks back first, so the end screen shows them
 
             try
             {

@@ -102,6 +102,7 @@ namespace HostRules
                 ImpostorChat.Reset();
                 Jester.Reset();
                 JesterWin.Reset();
+                CommsCamo.Reset();
                 Plugin.ResetSwitches();
                 ChatLine.ClearQueue();
                 Reveal.Clear();
@@ -305,6 +306,7 @@ namespace HostRules
             {
                 if (!Gate.ActiveHost()) return;
                 TaskTimer.Pause();
+                CommsCamo.OnMeetingCalled(); // real names back first, so the Jester gets his real name too
                 Jester.OnMeetingCalled();
             }
             catch (Exception e) { Plugin.L.LogError("[timer] " + e); }
@@ -337,6 +339,7 @@ namespace HostRules
             {
                 if (!Gate.ActiveHost()) return;
                 TaskTimer.Resume("players can move");
+                CommsCamo.OnControlBack();
                 Jester.TryEndGame();
                 Jester.OnControlBack();
             }
@@ -404,6 +407,7 @@ namespace HostRules
     }
 
     // Host-as-Jester: the game refreshes the name text on every player's fixed update; put the tag back right after.
+    // Same for a host who is an impostor while comms has everyone nameless: his partners' names stay on his screen.
     [HarmonyPatch(typeof(PlayerControl), nameof(PlayerControl.FixedUpdate))]
     internal static class Patch_PlayerFixed
     {
@@ -411,6 +415,8 @@ namespace HostRules
         {
             try { Jester.OnPlayerFixedUpdate(__instance); }
             catch (Exception e) { Plugin.L.LogError("[jester] " + e); }
+            try { if (Gate.ActiveHost()) CommsCamo.OnPlayerFixedUpdate(__instance); }
+            catch (Exception e) { Plugin.L.LogError("[comms] " + e); }
         }
     }
 
@@ -426,6 +432,7 @@ namespace HostRules
             try
             {
                 if (!Gate.ActiveHost() || !Gate.ClassicMode()) return;
+                CommsCamo.OnRoundStart(); // real looks saved before anything can change them
                 Jester.OnRoundStart();
             }
             catch (Exception e) { Plugin.L.LogError("[jester] " + e); }
@@ -441,6 +448,7 @@ namespace HostRules
             try
             {
                 if (!Gate.ActiveHost() || !Gate.ClassicMode()) return;
+                CommsCamo.EnsureStarted();
                 Jester.EnsurePicked();
             }
             catch (Exception e) { Plugin.L.LogError("[jester] " + e); }
@@ -501,12 +509,13 @@ namespace HostRules
 
     // While the Jester's victory screen is being prepared, the normal end checks must wait (otherwise changing the
     // impostors' roles would look like "no impostors left" and end the game as a crew win).
+    // Same while an ending waits for the real looks to go out (comms camouflage).
     [HarmonyPatch(typeof(LogicGameFlowNormal), nameof(LogicGameFlowNormal.CheckEndCriteria))]
     internal static class Patch_EndCheckHold
     {
         public static bool Prefix()
         {
-            try { return !(JesterWin.Running && Gate.ActiveHost()); }
+            try { return !((JesterWin.Running || CommsCamo.HoldingEnd) && Gate.ActiveHost()); }
             catch (Exception) { return true; }
         }
     }
@@ -516,10 +525,12 @@ namespace HostRules
     //    leaves as many Impostors as crewmates: the game then wants to end the round at once as an Impostor win,
     //    and on some maps (Airship) the ejection scene finishes without the moment the Jester's win normally starts.
     //  - While the Jester's win is being shown, any other ending is held back.
+    //  - While comms has everyone grey, the real looks are sent first and the ending follows a moment later, so the
+    //    end screen shows everyone's real look.
     [HarmonyPatch(typeof(GameManager), nameof(GameManager.RpcEndGame))]
     internal static class Patch_EndGameGuard
     {
-        public static bool Prefix(GameOverReason endReason)
+        public static bool Prefix(GameOverReason endReason, bool showAd)
         {
             try
             {
@@ -539,6 +550,12 @@ namespace HostRules
                 }
             }
             catch (Exception e) { Plugin.L.LogError("[jester] " + e); }
+
+            try
+            {
+                if (CommsCamo.HoldEnd(endReason, showAd)) return false;
+            }
+            catch (Exception e) { Plugin.L.LogError("[comms] " + e); }
             return true;
         }
     }
@@ -593,6 +610,7 @@ namespace HostRules
                 if (!Gate.ActiveHost()) return;
                 TaskTimer.Tick();
                 VisionOverride.TickLights();
+                CommsCamo.Tick();
                 Jester.Tick();
                 ChatLine.Pump();
                 Reveal.Tick();
@@ -611,6 +629,7 @@ namespace HostRules
             {
                 TaskTimer.Reset();
                 JesterWin.Reset();
+                CommsCamo.Reset();
                 VisionOverride.OnGameEnd();
                 if (Gate.ActiveHost()) Jester.OnRoundEnd(); else Jester.Reset();
                 ImpostorChat.Reset();

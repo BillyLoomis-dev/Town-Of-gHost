@@ -14,14 +14,14 @@ namespace HostRules
     }
 
     // Town of GHost: host-only rules for private Among Us games. Only the HOST needs this plugin; it never acts when you are not the host.
-    // Every special rule (time limit, Jester, impostor chat, vision) is OFF in a new lobby and is switched on by the host
+    // Every special rule (time limit, Jester, impostor chat, vision, comms camouflage, pets) is OFF in a new lobby and is switched on by the host
     // with chat commands (type /help in the lobby). The choices stay on after a game is over.
     [BepInPlugin(Id, "Town of GHost", Version)]
     [BepInProcess("Among Us.exe")]
     public class Plugin : BasePlugin
     {
         public const string Id = "local.townofghost";
-        public const string Version = "2.8.1";
+        public const string Version = "2.9.0";
 
         internal static ManualLogSource L;
 
@@ -53,12 +53,16 @@ namespace HostRules
         internal static readonly Flag TimeLimitEnabled = new Flag();
         internal static readonly Flag JesterEnabled = new Flag();
         internal static readonly Flag ImpostorChatEnabled = new Flag();
+        internal static readonly Flag CommsCamoEnabled = new Flag();
+        internal static readonly Flag DeadPetRemovalEnabled = new Flag();
 
         internal static void ResetSwitches()
         {
             TimeLimitEnabled.Value = false;
             JesterEnabled.Value = false;
             ImpostorChatEnabled.Value = false;
+            CommsCamoEnabled.Value = false;
+            DeadPetRemovalEnabled.Value = false;
         }
 
         public override void Load()

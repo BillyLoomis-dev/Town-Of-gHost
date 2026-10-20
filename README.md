@@ -4,7 +4,7 @@
 
 Town of gHost is a **host-only** Among Us mod: only the host installs it. Your friends join with the normal, unmodded game and still get every rule.
 
-It brings the ranked-mode settings into private lobbies — a task time limit for the crew, the time left posted in every meeting — and adds a Jester, an impostor secret chat and crewmate vision far below the game's own minimum.
+It brings the ranked-mode settings into private lobbies — a task time limit for the crew, the time left posted in every meeting — and adds a Jester, an impostor secret chat, comms camouflage and crewmate vision far below the game's own minimum.
 
 > Not affiliated with Innersloth. Use it in private lobbies with friends. Innersloth's mod policy applies.
 
@@ -43,6 +43,12 @@ After an Among Us update the mod must be rebuilt for the new version.
   - When he wins, **everyone's end screen** shows him as the only winner, and the lobby chat reveals the Jester's and the Impostors' colors (Impostors who left are listed too, marked "(left)").
   - **Judge:** a Judge who overrules the Jester ejects **him** (he wins) instead of being ejected for a wrong judgment. If the Jester is the Judge, getting ejected by his own wrong overrule doesn't count as a win.
 - **Impostor secret chat** — impostors talk privately in meetings. Only impostors and dead players can read it.
+- **Comms camouflage** — while communications are sabotaged, every living player is **grey with no name, hat, skin, visor or pet** — everyone sees everyone, and himself, that way (the color-blind label reads "Gray" too).
+  - Names come back in meetings; the looks stay grey until comms is fixed.
+  - Impostors still see each other's names.
+  - A body stays grey, so nobody knows who died until the meeting.
+  - Real looks come back when comms is fixed, and before the end screen.
+- **No pets on bodies** — a player's pet disappears the moment he dies, so it can't stay by his body and point the crew to it.
 - **Lobby keep-alive** — automatically accepts the server's "extend lobby" offer so the lobby isn't closed for inactivity.
 - **Everything is announced** — every rule change is posted in the lobby chat for everyone.
 - **Town of gHost look** — the Town of gHost picture while the game loads (click to skip), the Town of gHost banner in the main menu, and the mod's name, version and website in the top-right corner under the ping. Only on your screen.
@@ -68,8 +74,10 @@ Type them in the chat. Only you, the host, can use them, and they are never sent
 | `/lightvision off` | Back to the game's own darkening when the lights are out. |
 | `/jester on` / `/jester off` | Turns the Jester on or off. |
 | `/impchat on` / `/impchat off` | Turns the impostor secret chat on or off. |
+| `/comms on` / `/comms off` | Comms camouflage: everyone grey and nameless while comms is sabotaged. |
+| `/pet on` / `/pet off` | A player's pet disappears when he dies. |
 
-`/time`, `/vision`, `/lightvision`, `/jester` and `/impchat` work in the lobby, before the game starts.
+`/time`, `/vision`, `/lightvision`, `/jester`, `/impchat`, `/comms` and `/pet` work in the lobby, before the game starts.
 
 ### Impostor secret chat
 - Impostors who are **not the host** type **`/cmd your message`** in a meeting.
