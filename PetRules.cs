@@ -17,11 +17,11 @@ namespace HostRules
             var d = pc.Data;
             if (d == null || d.Disconnected || !d.IsDead) return;
             var o = d.DefaultOutfit;
-            if (o == null || string.IsNullOrEmpty(o.PetId) || o.PetId == CommsCamo.NoPet) return;
+            if (o == null || string.IsNullOrEmpty(o.PetId) || o.PetId == Looks.NoPet) return;
 
             try
             {
-                pc.RpcSetPet(CommsCamo.NoPet);
+                Looks.SendPet(pc, Looks.NoPet);
                 Plugin.L.LogInfo("[pet] a dead player's pet was removed");
             }
             catch (Exception e)

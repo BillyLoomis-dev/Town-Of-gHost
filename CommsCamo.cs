@@ -26,15 +26,17 @@ namespace HostRules
     //  - The Fungle: nothing is changed while the game's own Mushroom Mixup is running.
     //  - Round over: the real looks are sent first and the ending waits a moment, so the end screen shows them.
     //  - Only a few players are changed per frame, so the server never gets a big burst of messages.
+    //  - Looks are sent with Looks.Send (one packet per player, also right for the host's own player) and sent once
+    //    more about 1 s later, in case a player's game dropped the first one.
+    //  - Meetings: the real names go out the moment a body is reported or the button is pressed, before the meeting
+    //    screen is built (its voting cards keep the names they were built with).
     internal static class CommsCamo
     {
         private const byte Gray = 15;
-        private const string NoHat = "hat_NoHat";
-        private const string NoSkin = "skin_None";
-        private const string NoVisor = "visor_EmptyVisor";
-        public const string NoPet = "pet_EmptyPet";
 
-        private const int PlayersPerFrame = 4;
+        private const int PlayersPerFrame = 3;
+        private const double ConfirmSeconds = 1.0;           // looks are sent once more after this
+        private const double ReportTimeoutSeconds = 8;       // a report that never became a meeting
         private const double PartnerResendSeconds = 1.5;
         private const double PrivateNameDelaySeconds = 0.25; // private names go out after the shared ones
         private const double MeetingFallbackSeconds = 20;    // if "players can move" is never reported
@@ -54,13 +56,15 @@ namespace HostRules
         private static readonly Dictionary<byte, Look> Real = new Dictionary<byte, Look>();
         private static readonly HashSet<byte> Grey = new HashSet<byte>();     // players showing the grey look now
         private static readonly HashSet<byte> Restore = new HashSet<byte>();  // grey players whose real look is due
+        private static readonly Dictionary<byte, DateTime> Confirm = new Dictionary<byte, DateTime>(); // look re-sent then
 
         private static bool _started;     // this round was set up
         private static bool _rule;        // /comms was on when this round started
         private static bool _on;          // comms is down and the grey look is being shown
         private static bool _namesShown;  // a meeting is on: the real names are back
         private static bool _final;       // the round is ending: real looks for good, nothing turns grey any more
-        private static bool _inMeeting;   // from the meeting call until players can move again
+        private static bool _inMeeting;   // from the report / meeting call until players can move again
+        private static bool _meetingSure; // the meeting really started (not just a report)
         private static DateTime _meetingMark;
         private static DateTime _nextPartners = DateTime.MinValue;
 
@@ -79,12 +83,15 @@ namespace HostRules
             Real.Clear();
             Grey.Clear();
             Restore.Clear();
+            Confirm.Clear();
+            Looks.Reset();
             _started = false;
             _rule = false;
             _on = false;
             _namesShown = false;
             _final = false;
             _inMeeting = false;
+            _meetingSure = false;
             _holding = false;
             _endingNow = false;
         }
@@ -161,17 +168,32 @@ namespace HostRules
             if (client == null || !client.IsGameStarted) return;
             var ship = ShipStatus.Instance;
             if (ship == null || JesterWin.Running) return;
+
+            ConfirmDue(now);
+
             if (MeetingHud.Instance != null || ExileController.Instance != null)
             {
-                if (_inMeeting) _meetingMark = now;
+                if (_inMeeting)
+                {
+                    _meetingMark = now;
+                    _meetingSure = true;
+                }
                 return;
             }
             if (_inMeeting)
             {
-                // The meeting intro, the ejection, Airship's spawn choice: wait until players can move again.
-                if ((now - _meetingMark).TotalSeconds < MeetingFallbackSeconds) return;
-                _inMeeting = false;
-                Plugin.L.LogInfo("[comms] players can move again (fallback)");
+                double since = (now - _meetingMark).TotalSeconds;
+                if (!_meetingSure && since >= ReportTimeoutSeconds)
+                {
+                    _inMeeting = false;
+                    Plugin.L.LogInfo("[comms] the report did not start a meeting");
+                }
+                else if (since < MeetingFallbackSeconds) return; // meeting intro, ejection, Airship's spawn choice
+                else
+                {
+                    _inMeeting = false;
+                    Plugin.L.LogInfo("[comms] players can move again (fallback)");
+                }
             }
 
             bool down = CommsDown(ship) && !MixupActive(ship);
@@ -276,18 +298,48 @@ namespace HostRules
             try
             {
                 if (pc.CurrentOutfitType == PlayerOutfitType.Shapeshifted) pc.RpcShapeshift(pc, false);
-                pc.RpcSetColor(Gray);
-                pc.RpcSetHat(NoHat);
-                pc.RpcSetSkin(NoSkin);
-                pc.RpcSetVisor(NoVisor);
-                pc.RpcSetPet(NoPet);
-                pc.RpcSetName(Hidden(l.Name));
+                Looks.Send(pc, Gray, Looks.NoHat, Looks.NoSkin, Looks.NoVisor, Looks.NoPet, Hidden(l.Name), true);
+                Confirm[pc.PlayerId] = DateTime.UtcNow.AddSeconds(ConfirmSeconds);
             }
             catch (Exception e)
             {
                 Plugin.L.LogWarning("[comms] could not make a player grey: " + e.Message);
             }
             return true;
+        }
+
+        // About 1 s after a change: send the look that player should have now once more (never the name, so the
+        // private names - impostor partners, the Jester's tag - aren't overwritten).
+        private static void ConfirmDue(DateTime now)
+        {
+            if (Confirm.Count == 0) return;
+            int n = 0;
+            foreach (var id in new List<byte>(Confirm.Keys))
+            {
+                if (n >= PlayersPerFrame) break;
+                if (now < Confirm[id]) continue;
+                Confirm.Remove(id);
+                var pc = Find(id);
+                Look l;
+                if (pc == null || pc.Data == null || pc.Data.Disconnected || !Real.TryGetValue(id, out l)) continue;
+                try
+                {
+                    if (Grey.Contains(id))
+                    {
+                        Looks.Send(pc, Gray, Looks.NoHat, Looks.NoSkin, Looks.NoVisor, Looks.NoPet, null, false, Looks.ResendLead);
+                    }
+                    else
+                    {
+                        bool dead = pc.Data.IsDead;
+                        Looks.Send(pc, (byte)l.Color, l.Hat, l.Skin, l.Visor, dead ? Looks.NoPet : l.Pet, null, false, Looks.ResendLead);
+                    }
+                }
+                catch (Exception e)
+                {
+                    Plugin.L.LogWarning("[comms] could not re-send a look: " + e.Message);
+                }
+                n++;
+            }
         }
 
         // Real looks back (a few per frame). Not during meetings, and not for someone in a vent or invisible,
@@ -343,12 +395,9 @@ namespace HostRules
             try
             {
                 if (!final && !dead && pc.CurrentOutfitType == PlayerOutfitType.Shapeshifted) pc.RpcShapeshift(pc, false);
-                pc.RpcSetColor((byte)l.Color);
-                pc.RpcSetHat(string.IsNullOrEmpty(l.Hat) ? NoHat : l.Hat);
-                pc.RpcSetSkin(string.IsNullOrEmpty(l.Skin) ? NoSkin : l.Skin);
-                pc.RpcSetVisor(string.IsNullOrEmpty(l.Visor) ? NoVisor : l.Visor);
-                pc.RpcSetPet(dead || string.IsNullOrEmpty(l.Pet) ? NoPet : l.Pet);
-                pc.RpcSetName(l.Name);
+                Looks.Send(pc, (byte)l.Color, l.Hat, l.Skin, l.Visor, dead ? Looks.NoPet : l.Pet, l.Name, true);
+                if (final) Confirm.Remove(id);
+                else Confirm[id] = DateTime.UtcNow.AddSeconds(ConfirmSeconds);
             }
             catch (Exception e)
             {
@@ -358,23 +407,47 @@ namespace HostRules
 
         // ---------------------------------------------------------------- meetings
 
-        // A meeting was called: real names back before the meeting screen is built. Looks stay grey.
+        // A body was reported or the button pressed (host side, before anything of the meeting exists): real names
+        // back right away, so every player's voting cards are built with them. Looks stay grey.
+        public static void OnReport()
+        {
+            if (!_rule || _final || MeetingHud.Instance != null) return;
+            if (!_inMeeting)
+            {
+                _inMeeting = true;
+                _meetingSure = false;
+            }
+            _meetingMark = DateTime.UtcNow;
+            ShowRealNames("report");
+        }
+
+        // The meeting really starts (backup, in case the report wasn't seen).
         public static void OnMeetingCalled()
         {
             if (!_rule || _final) return;
             _inMeeting = true;
+            _meetingSure = true;
             _meetingMark = DateTime.UtcNow;
-            if (Grey.Count == 0) return;
+            ShowRealNames("meeting");
+        }
+
+        private static void ShowRealNames(string why)
+        {
+            if (_namesShown || Grey.Count == 0) return;
+            var pcs = new List<PlayerControl>();
+            var names = new List<string>();
             foreach (var id in Grey)
             {
                 var pc = Find(id);
                 Look l;
                 if (pc == null || !Real.TryGetValue(id, out l)) continue;
-                try { pc.RpcSetName(l.Name); }
-                catch (Exception e) { Plugin.L.LogWarning("[comms] could not show a name for the meeting: " + e.Message); }
+                pcs.Add(pc);
+                names.Add(l.Name);
             }
+            try { Looks.SendNames(pcs, names); }
+            catch (Exception e) { Plugin.L.LogWarning("[comms] could not show the names for the meeting: " + e.Message); }
             _namesShown = true;
-            Plugin.L.LogInfo("[comms] meeting: real names shown (the looks stay grey while comms is down)");
+            Plugin.L.LogInfo("[comms] " + why + ": real names shown for the meeting (the looks stay grey while comms is down)");
         }
 
         // Players can move again after the meeting (the next frame decides what to show).
@@ -386,6 +459,8 @@ namespace HostRules
         // Players can move again and comms is still down: names hidden again (the living; ghosts keep theirs).
         private static void HideNamesAgain()
         {
+            var pcs = new List<PlayerControl>();
+            var names = new List<string>();
             foreach (var id in Grey)
             {
                 var pc = Find(id);
@@ -393,9 +468,11 @@ namespace HostRules
                 if (pc == null || !Real.TryGetValue(id, out l)) continue;
                 var d = pc.Data;
                 if (d == null || d.IsDead || d.Disconnected) continue;
-                try { pc.RpcSetName(Hidden(l.Name)); }
-                catch (Exception e) { Plugin.L.LogWarning("[comms] could not hide a name: " + e.Message); }
+                pcs.Add(pc);
+                names.Add(Hidden(l.Name));
             }
+            try { Looks.SendNames(pcs, names); }
+            catch (Exception e) { Plugin.L.LogWarning("[comms] could not hide the names: " + e.Message); }
             PrivateNamesSoon();
             Plugin.L.LogInfo("[comms] comms is still down after the meeting: names hidden again");
         }

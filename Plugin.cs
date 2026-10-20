@@ -21,7 +21,7 @@ namespace HostRules
     public class Plugin : BasePlugin
     {
         public const string Id = "local.townofghost";
-        public const string Version = "2.9.0";
+        public const string Version = "2.9.1";
 
         internal static ManualLogSource L;
 

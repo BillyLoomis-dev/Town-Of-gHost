@@ -296,6 +296,22 @@ namespace HostRules
         }
     }
 
+    // A body was reported or the button pressed (the host's first step of a meeting, before the meeting intro):
+    // comms camouflage puts the real names back now, so every player's voting cards are built with them.
+    [HarmonyPatch(typeof(PlayerControl), nameof(PlayerControl.ReportDeadBody))]
+    internal static class Patch_ReportBody
+    {
+        public static void Prefix()
+        {
+            try
+            {
+                if (!Gate.ActiveHost()) return;
+                CommsCamo.OnReport();
+            }
+            catch (Exception e) { Plugin.L.LogError("[comms] " + e); }
+        }
+    }
+
     // A meeting was called (emergency button or body report): pause right away.
     [HarmonyPatch(typeof(PlayerControl), nameof(PlayerControl.StartMeeting))]
     internal static class Patch_MeetingCalled
