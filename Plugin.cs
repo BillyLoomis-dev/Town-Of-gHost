@@ -14,14 +14,14 @@ namespace HostRules
     }
 
     // Town of GHost: host-only rules for private Among Us games. Only the HOST needs this plugin; it never acts when you are not the host.
-    // Every special rule (time limit, Jester, impostor chat, vision, comms camouflage, pets) is OFF in a new lobby and is switched on by the host
+    // Every special rule (time limit, Jester, impostor chat, vision, comms camouflage, pets, reactor flashing) is OFF in a new lobby and is switched on by the host
     // with chat commands (type /help in the lobby). The choices stay on after a game is over.
     [BepInPlugin(Id, "Town of GHost", Version)]
     [BepInProcess("Among Us.exe")]
     public class Plugin : BasePlugin
     {
         public const string Id = "local.townofghost";
-        public const string Version = "2.9.1";
+        public const string Version = "2.10.0";
 
         internal static ManualLogSource L;
 
@@ -42,6 +42,7 @@ namespace HostRules
         internal static ConfigEntry<float> JesterBadgeOffset;
         internal static ConfigEntry<float> VisionMin;
         internal static ConfigEntry<float> VisionMax;
+        internal static ConfigEntry<float> ReactorFlashSeconds;
         internal static ConfigEntry<int> SettingsVersion;
         internal static ConfigEntry<bool> LobbyKeepAlive;
         internal static ConfigEntry<float> LobbyKeepAliveMaxMinutes;
@@ -55,6 +56,7 @@ namespace HostRules
         internal static readonly Flag ImpostorChatEnabled = new Flag();
         internal static readonly Flag CommsCamoEnabled = new Flag();
         internal static readonly Flag DeadPetRemovalEnabled = new Flag();
+        internal static readonly Flag ReactorFlashEnabled = new Flag();
 
         internal static void ResetSwitches()
         {
@@ -63,6 +65,7 @@ namespace HostRules
             ImpostorChatEnabled.Value = false;
             CommsCamoEnabled.Value = false;
             DeadPetRemovalEnabled.Value = false;
+            ReactorFlashEnabled.Value = false;
         }
 
         public override void Load()
@@ -106,6 +109,8 @@ namespace HostRules
 
             VisionMin = Config.Bind("Vision", "VisionMin", 0f, "Lowest crewmate vision the host can set with /vision and /lightvision. 0 = pitch black.");
             VisionMax = Config.Bind("Vision", "VisionMax", 0.5f, "Highest crewmate vision the host can set with /vision and /lightvision.");
+            ReactorFlashSeconds = Config.Bind("Vision", "ReactorFlashSeconds", 1f,
+                "/reactor: seconds between flashes (0.5 - 3) while Polus' seismic stabilizers are sabotaged. /reactor X changes this value and saves it.");
 
             LobbyKeepAlive = Config.Bind("Lobby", "LobbyKeepAlive", true,
                 "When the server warns that the lobby is about to close for inactivity, accept the extension automatically (the game's own 'extend' feature). The server decides how many extensions it offers.");

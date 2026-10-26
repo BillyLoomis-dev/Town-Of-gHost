@@ -99,6 +99,7 @@ namespace HostRules
                 HostFlag.Set(false, "main menu");
                 TaskTimer.Reset();
                 VisionOverride.ResetAtMenu();
+                ReactorStrobe.Reset();
                 ImpostorChat.Reset();
                 Jester.Reset();
                 JesterWin.Reset();
@@ -106,6 +107,7 @@ namespace HostRules
                 Plugin.ResetSwitches();
                 ChatLine.ClearQueue();
                 Reveal.Clear();
+                KickNote.Clear();
             }
             catch (Exception e) { Plugin.L.LogError("[host] " + e); }
         }
@@ -271,6 +273,7 @@ namespace HostRules
             {
                 if (!Gate.ActiveHost()) return;
                 VisionOverride.OnGameStart();
+                ReactorStrobe.Reset();
                 VisionOverride.ReassertAndSync();
             }
             catch (Exception e) { Plugin.L.LogError("[vision] " + e); }
@@ -487,6 +490,7 @@ namespace HostRules
     }
 
     // A task was completed: recount, so a task the Jester finishes never counts.
+    // Comms camouflage: the hidden names are sent again a moment later (like Town of Host).
     [HarmonyPatch(typeof(GameData), nameof(GameData.CompleteTask))]
     internal static class Patch_TaskCompleted
     {
@@ -494,10 +498,65 @@ namespace HostRules
         {
             try
             {
-                if (!Gate.ActiveHost() || !Jester.Active) return;
-                TaskCount.Refresh();
+                if (!Gate.ActiveHost()) return;
+                CommsCamo.OnEvent(CommsCamo.EventDelaySeconds, false);
+                if (Jester.Active) TaskCount.Refresh();
             }
             catch (Exception e) { Plugin.L.LogError("[tasks] " + e); }
+        }
+    }
+
+    // ---------------------------------------------------------------- comms camouflage: kills and shapeshifts
+
+    // A player died (a kill; ejections happen in meetings, where nothing is sent): names hidden again a moment later.
+    [HarmonyPatch(typeof(PlayerControl), nameof(PlayerControl.Die))]
+    internal static class Patch_CommsAfterDeath
+    {
+        public static void Postfix()
+        {
+            try
+            {
+                if (!Gate.ActiveHost()) return;
+                CommsCamo.OnEvent(CommsCamo.EventDelaySeconds, false);
+            }
+            catch (Exception e) { Plugin.L.LogError("[comms] " + e); }
+        }
+    }
+
+    // The host checks every shapeshift request: during comms, becoming a dead player (or anyone who isn't grey) is
+    // refused the way Town of Host refuses a shapeshift, so it never shows.
+    [HarmonyPatch(typeof(PlayerControl), nameof(PlayerControl.CheckShapeshift))]
+    internal static class Patch_CommsShapeshiftCheck
+    {
+        public static bool Prefix(PlayerControl __instance, [HarmonyArgument(0)] PlayerControl target)
+        {
+            try
+            {
+                if (!Gate.ActiveHost() || !CommsCamo.RefuseShapeshift(__instance, target)) return true;
+                __instance.RpcRejectShapeshift();
+                Plugin.L.LogInfo("[comms] shapeshift into a player who isn't grey refused");
+                return false;
+            }
+            catch (Exception e)
+            {
+                Plugin.L.LogError("[comms] " + e);
+                return true;
+            }
+        }
+    }
+
+    // A shapeshift or turning back happened (every player's game, the host's too).
+    [HarmonyPatch(typeof(PlayerControl), nameof(PlayerControl.Shapeshift))]
+    internal static class Patch_CommsShapeshift
+    {
+        public static void Postfix(PlayerControl __instance, [HarmonyArgument(0)] PlayerControl targetPlayer, [HarmonyArgument(1)] bool animate)
+        {
+            try
+            {
+                if (!Gate.ActiveHost()) return;
+                CommsCamo.OnShapeshift(__instance, targetPlayer, animate);
+            }
+            catch (Exception e) { Plugin.L.LogError("[comms] " + e); }
         }
     }
 
@@ -626,10 +685,12 @@ namespace HostRules
                 if (!Gate.ActiveHost()) return;
                 TaskTimer.Tick();
                 VisionOverride.TickLights();
+                ReactorStrobe.Tick();
                 CommsCamo.Tick();
                 Jester.Tick();
                 ChatLine.Pump();
                 Reveal.Tick();
+                KickNote.Tick();
             }
             catch (Exception e) { Plugin.L.LogError("[timer] " + e); }
         }
@@ -639,14 +700,16 @@ namespace HostRules
     [HarmonyPatch(typeof(AmongUsClient), nameof(AmongUsClient.OnGameEnd))]
     internal static class Patch_RoundEnded
     {
-        public static void Prefix()
+        public static void Prefix(EndGameResult endGameResult)
         {
             try
             {
+                if (Gate.ActiveHost() && endGameResult != null) KickNote.OnGameEnd(endGameResult.GameOverReason);
                 TaskTimer.Reset();
                 JesterWin.Reset();
                 CommsCamo.Reset();
                 VisionOverride.OnGameEnd();
+                ReactorStrobe.Reset();
                 if (Gate.ActiveHost()) Jester.OnRoundEnd(); else Jester.Reset();
                 ImpostorChat.Reset();
             }

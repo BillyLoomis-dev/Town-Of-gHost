@@ -80,6 +80,19 @@ namespace HostRules
             return l;
         }
 
+        public static List<string> ReactorLines()
+        {
+            var l = new List<string>();
+            if (!Plugin.ReactorFlashEnabled.Value)
+            {
+                l.Add("Reactor flashing: OFF.");
+                return l;
+            }
+            l.Add("Reactor flashing: ON. Polus seismic sabotage: crew lights flash pitch black every " + Num(ReactorStrobe.Seconds) + " s.");
+            l.Add("Impostors keep their vision. The flashing stops when the sabotage is fixed.");
+            return l;
+        }
+
         public static List<string> VisionLines()
         {
             var l = new List<string>();
@@ -120,6 +133,7 @@ namespace HostRules
             if (Plugin.ImpostorChatEnabled.Value) body.AddRange(ImpChatLines());
             if (Plugin.CommsCamoEnabled.Value) body.AddRange(CommsLines());
             if (Plugin.DeadPetRemovalEnabled.Value) body.AddRange(PetLines());
+            if (Plugin.ReactorFlashEnabled.Value) body.AddRange(ReactorLines());
             if (VisionOverride.Value.HasValue) body.AddRange(VisionLines());
             if (VisionOverride.LightValue.HasValue) body.AddRange(LightVisionLines());
 

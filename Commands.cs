@@ -12,6 +12,8 @@ namespace HostRules
         private const double MinMinutes = 0.5;
         private const double MaxMinutes = 180;
 
+        private const string WelcomeLine = "Welcome to Town Of gHost ! Harder gameplay options for experienced crewmates.";
+
         // True while the plugin itself is sending chat, so its own lines are never re-read as commands.
         public static bool Busy;
 
@@ -42,6 +44,9 @@ namespace HostRules
 
             if (IsWord(text, "/help")) { Help(me); return true; }
             if (IsWord(text, "/settings")) { Announce(Rules.SettingsLines()); return true; }
+            if (IsWord(text, "/welcome")) { Announce(new List<string> { WelcomeLine }); return true; }
+            if (IsWord(text, "/kick")) { Kick(me, Arg(text, "/kick"), false); return true; }
+            if (IsWord(text, "/ban")) { Kick(me, Arg(text, "/ban"), true); return true; }
             if (IsWord(text, "/time")) { Time(me, Arg(text, "/time")); return true; }
             if (IsWord(text, "/vision")) { Vision(me, Arg(text, "/vision")); return true; }
             if (IsWord(text, "/lightvision")) { LightVision(me, Arg(text, "/lightvision")); return true; }
@@ -49,6 +54,7 @@ namespace HostRules
             if (IsWord(text, "/impchat")) { Switch(me, "/impchat", Arg(text, "/impchat"), Plugin.ImpostorChatEnabled, Rules.ImpChatLines); return true; }
             if (IsWord(text, "/comms")) { Switch(me, "/comms", Arg(text, "/comms"), Plugin.CommsCamoEnabled, Rules.CommsLines); return true; }
             if (IsWord(text, "/pet")) { Switch(me, "/pet", Arg(text, "/pet"), Plugin.DeadPetRemovalEnabled, Rules.PetLines); return true; }
+            if (IsWord(text, "/reactor")) { Reactor(me, Arg(text, "/reactor")); return true; }
 
             // Host as impostor: "// msg" (or "/cmd msg") goes to the impostor team only (when impostor chat is on).
             string secret = null;
@@ -77,8 +83,11 @@ namespace HostRules
             Local(me, "/impchat on | off - private impostor chat. Impostors type /cmd message; you type // message if you are an impostor.");
             Local(me, "/comms on | off - while comms is sabotaged everyone is grey with no name (impostors still see each other's names).");
             Local(me, "/pet on | off - a player's pet disappears the moment he dies, so it can't stay by his body.");
+            Local(me, "/reactor on | off - Polus seismic sabotage: crew lights flash pitch black.  /reactor 1 = seconds per flash (" + Rules.Num(ReactorStrobe.MinSeconds) + "-" + Rules.Num(ReactorStrobe.MaxSeconds) + ").");
             Local(me, "/settings - post the rules that are ON in the chat for everyone.  /help - this list.");
-            Local(me, "/time, /vision, /lightvision, /jester, /impchat, /comms and /pet only work in the lobby. Every change is announced to everyone.");
+            Local(me, "/welcome - post the welcome line in the chat for everyone.");
+            Local(me, "/kick red | /ban red - remove a player by his REAL color (also while comms has everyone grey). Everyone is told.");
+            Local(me, "/time, /vision, /lightvision, /jester, /impchat, /comms, /pet and /reactor only work in the lobby. Every change is announced to everyone.");
         }
 
         // ---------------------------------------------------------------- /time
@@ -220,6 +229,136 @@ namespace HostRules
         private static string Range()
         {
             return Rules.Num(Lowest()) + "-" + Rules.Num(Plugin.VisionMax.Value);
+        }
+
+        // ---------------------------------------------------------------- /kick and /ban (by real color)
+
+        // English color names by color number (the game's own name for the color is accepted too).
+        private static readonly string[] ColorNames =
+        {
+            "red", "blue", "green", "pink", "orange", "yellow", "black", "white", "purple",
+            "brown", "cyan", "lime", "maroon", "rose", "banana", "gray", "tan", "coral",
+        };
+
+        private static void Kick(PlayerControl me, string arg, bool ban)
+        {
+            string cmd = ban ? "/ban" : "/kick";
+            string done = ban ? "banned" : "kicked";
+            if (arg.Length == 0)
+            {
+                Local(me, "Usage: " + cmd + " red  (the player's real color, also while comms has everyone grey)");
+                Local(me, "Players: " + PlayerColors());
+                return;
+            }
+
+            var target = FindByColor(arg);
+            if (target == null)
+            {
+                Local(me, "No player with the color '" + arg + "'. Players: " + PlayerColors());
+                return;
+            }
+            if (target == me)
+            {
+                Local(me, "You can't " + (ban ? "ban" : "kick") + " yourself.");
+                return;
+            }
+
+            var color = ColorText(CommsCamo.RealColor(target.Data));
+            var name = Strip(target.Data.PlayerName).Trim(); // the real name, also while comms hides it
+            var who = name.Length > 0 ? color + " (" + name + ")" : color;
+            try
+            {
+                AmongUsClient.Instance.KickPlayer(target.OwnerId, ban);
+                KickNote.OnKick(who, ban); // told to everyone, and again in the lobby if it ended the round
+                Plugin.L.LogInfo("[cmd] a player was " + done);
+            }
+            catch (Exception e)
+            {
+                Local(me, "Could not " + (ban ? "ban" : "kick") + " " + color + ".");
+                Plugin.L.LogWarning("[cmd] " + cmd + " failed: " + e.Message);
+            }
+        }
+
+        // The connected player whose REAL color matches (English name, or the game's own name for it).
+        private static PlayerControl FindByColor(string arg)
+        {
+            var wanted = NormalizeColor(arg);
+            var all = PlayerControl.AllPlayerControls;
+            if (all == null || wanted.Length == 0) return null;
+            for (int i = 0; i < all.Count; i++)
+            {
+                var pc = all[i];
+                var d = pc != null ? pc.Data : null;
+                if (d == null || d.Disconnected) continue;
+                int id = CommsCamo.RealColor(d);
+                if (id < 0) continue;
+                if (id < ColorNames.Length && ColorNames[id] == wanted) return pc;
+                string game = null;
+                try { game = Palette.GetColorName(id); } catch (Exception) { }
+                if (!string.IsNullOrEmpty(game) && NormalizeColor(game) == wanted) return pc;
+            }
+            return null;
+        }
+
+        private static string NormalizeColor(string s)
+        {
+            var t = Strip(s ?? "").Trim().ToLowerInvariant().Replace(" ", "");
+            return t == "grey" ? "gray" : t;
+        }
+
+        private static string ColorText(int id)
+        {
+            if (id >= 0 && id < ColorNames.Length)
+                return char.ToUpperInvariant(ColorNames[id][0]) + ColorNames[id].Substring(1);
+            return "That player";
+        }
+
+        // "Red, Blue, Lime" - the real colors of everyone connected except the host.
+        private static string PlayerColors()
+        {
+            var list = new List<string>();
+            var all = PlayerControl.AllPlayerControls;
+            if (all != null)
+                for (int i = 0; i < all.Count; i++)
+                {
+                    var pc = all[i];
+                    var d = pc != null ? pc.Data : null;
+                    if (d == null || d.Disconnected || pc == PlayerControl.LocalPlayer) continue;
+                    list.Add(ColorText(CommsCamo.RealColor(d)));
+                }
+            return list.Count == 0 ? "(nobody)" : string.Join(", ", list.ToArray());
+        }
+
+        // ---------------------------------------------------------------- /reactor
+        private static void Reactor(PlayerControl me, string arg)
+        {
+            string range = Rules.Num(ReactorStrobe.MinSeconds) + "-" + Rules.Num(ReactorStrobe.MaxSeconds);
+            if (arg.Length == 0)
+            {
+                foreach (var l in Rules.ReactorLines()) Local(me, l);
+                Local(me, "Usage: /reactor on | off, or /reactor 1 (seconds per flash, " + range + ")");
+                return;
+            }
+            if (!Gate.InLobby())
+            {
+                Local(me, "/reactor only works in the lobby, before the game starts.");
+                return;
+            }
+
+            if (arg.Equals("on", StringComparison.OrdinalIgnoreCase)) { Plugin.ReactorFlashEnabled.Value = true; Announce(Rules.ReactorLines()); return; }
+            if (arg.Equals("off", StringComparison.OrdinalIgnoreCase)) { Plugin.ReactorFlashEnabled.Value = false; Announce(Rules.ReactorLines()); return; }
+
+            double v;
+            if (!TryNum(arg, out v))
+            {
+                Local(me, "Usage: /reactor on | off, or /reactor 1 (seconds per flash, " + range + ")");
+                return;
+            }
+            var clamped = (float)Math.Min(ReactorStrobe.MaxSeconds, Math.Max(ReactorStrobe.MinSeconds, v));
+            Plugin.ReactorFlashSeconds.Value = clamped;
+            Plugin.ReactorFlashEnabled.Value = true;
+            if (Math.Abs(clamped - v) > 0.0001) Local(me, "(allowed range is " + range + " s)");
+            Announce(Rules.ReactorLines());
         }
 
         // ---------------------------------------------------------------- /jester, /impchat, /comms, /pet (plain on/off switches)

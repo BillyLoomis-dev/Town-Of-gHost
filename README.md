@@ -6,6 +6,8 @@ Town of gHost is a **host-only** Among Us mod: only the host installs it. Your f
 
 It brings the ranked-mode settings into private lobbies — a task time limit for the crew, the time left posted in every meeting — and adds a Jester, an impostor secret chat, comms camouflage and crewmate vision far below the game's own minimum.
 
+> **Recommended for the Polus map only.** Town of gHost is made and tested on Polus; `/reactor` only works there.
+
 > Not affiliated with Innersloth. Use it in private lobbies with friends. Innersloth's mod policy applies.
 
 ---
@@ -47,8 +49,10 @@ After an Among Us update the mod must be rebuilt for the new version.
   - Names come back in meetings; the looks stay grey until comms is fixed.
   - Impostors still see each other's names.
   - A body stays grey, so nobody knows who died until the meeting.
+  - A Shapeshifter can't disguise as a dead player during comms; someone already disguised turns grey like everyone.
   - Real looks come back when comms is fixed, and before the end screen.
 - **No pets on bodies** — a player's pet disappears the moment he dies, so it can't stay by his body and point the crew to it.
+- **Reactor flashing (Polus)** — during the seismic stabilizers sabotage, the crew's lights flash hard between pitch black and normal, every 0.5 to 3 seconds, until the sabotage is fixed. No dimming. Impostors keep their vision.
 - **Lobby keep-alive** — automatically accepts the server's "extend lobby" offer so the lobby isn't closed for inactivity.
 - **Everything is announced** — every rule change is posted in the lobby chat for everyone.
 - **Town of gHost look** — the Town of gHost picture while the game loads (click to skip), the Town of gHost banner in the main menu, and the mod's name, version and website in the top-right corner under the ping. Only on your screen.
@@ -65,6 +69,8 @@ Type them in the chat. Only you, the host, can use them, and they are never sent
 |---|---|
 | `/help` | Lists all commands (only you see it). |
 | `/settings` | Posts every rule that is ON, with its details, for everyone. Works any time. |
+| `/welcome` | Posts "Welcome to Town Of gHost ! Harder gameplay options for experienced crewmates." for everyone. |
+| `/kick red` / `/ban red` | Removes a player by his **real** color (also while comms has everyone grey). Works any time, meetings included. Everyone is told in the chat; if it ends the round, it's posted again in the lobby chat 5 seconds after the lobby opens. |
 | `/time on` / `/time off` | Turns the tasks time limit on or off. |
 | `/time X` | Sets the time limit to X minutes (0.5–180) and turns it on. Example: `/time 18` |
 | `/time pause on` / `/time pause off` | Should meetings pause the clock? |
@@ -76,8 +82,10 @@ Type them in the chat. Only you, the host, can use them, and they are never sent
 | `/impchat on` / `/impchat off` | Turns the impostor secret chat on or off. |
 | `/comms on` / `/comms off` | Comms camouflage: everyone grey and nameless while comms is sabotaged. |
 | `/pet on` / `/pet off` | A player's pet disappears when he dies. |
+| `/reactor on` / `/reactor off` | Polus seismic sabotage: the crew's lights flash pitch black and back. |
+| `/reactor X` | Seconds per flash, from 0.5 to 3 (turns it on). Example: `/reactor 1` |
 
-`/time`, `/vision`, `/lightvision`, `/jester`, `/impchat`, `/comms` and `/pet` work in the lobby, before the game starts.
+`/time`, `/vision`, `/lightvision`, `/jester`, `/impchat`, `/comms`, `/pet` and `/reactor` work in the lobby, before the game starts.
 
 ### Impostor secret chat
 - Impostors who are **not the host** type **`/cmd your message`** in a meeting.
@@ -108,6 +116,7 @@ Type them in the chat. Only you, the host, can use them, and they are never sent
 | Jester | `DebugLog` | false | Extra Jester logging. Can reveal the Jester — keep it off when playing. |
 | Vision | `VisionMin` | 0 | Lowest vision `/vision` and `/lightvision` allow (0 = pitch black). |
 | Vision | `VisionMax` | 0.5 | Highest vision `/vision` and `/lightvision` allow. |
+| Vision | `ReactorFlashSeconds` | 1 | Seconds per flash for `/reactor` (also changed by `/reactor X`). |
 | Lobby | `LobbyKeepAlive` | true | Auto-accept the server's lobby extension. |
 | Lobby | `LobbyKeepAliveMaxMinutes` | 0 | Stop extending after this many minutes. 0 = unlimited (as long as the server offers). |
 | Look | `ShowLoadingPicture` | true | Show the Town of gHost picture while the game loads. |

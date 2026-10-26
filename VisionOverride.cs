@@ -19,6 +19,9 @@ namespace HostRules
     //
     // The override is re-applied every time settings are synced and when the game starts, so nudging a slider can't
     // silently undo it.
+    //
+    // /reactor (ReactorStrobe): while Polus' seismic stabilizers are sabotaged, crew vision flashes between 0
+    // (pitch black) and normal. That "dark" state wins over everything else here.
     internal static class VisionOverride
     {
         private const float Darkest = 0.001f;           // sent for 0
@@ -29,6 +32,7 @@ namespace HostRules
         private static float? _light;    // /lightvision (null = the game's own darkening)
         private static float? _saved;    // the host's own slider value before the mod changed it
         private static bool _dark;       // lights are out and /lightvision is applied right now
+        private static bool _strobeDark; // /reactor: a pitch-black flash is on right now
         private static bool _sabotaged;
         private static DateTime _sabotageSince;
         private static bool _syncAtLobby;
@@ -78,6 +82,7 @@ namespace HostRules
         public static void OnGameStart()
         {
             _dark = false;
+            _strobeDark = false;
             _sabotaged = false;
             _syncAtLobby = false;
         }
@@ -86,9 +91,18 @@ namespace HostRules
         public static void OnGameEnd()
         {
             _sabotaged = false;
-            if (!_dark) return;
+            if (!_dark && !_strobeDark) return;
             _dark = false;
+            _strobeDark = false;
             if (Apply(false)) _syncAtLobby = true;
+        }
+
+        // /reactor: pitch black on or off (sync = send the settings to everyone now).
+        public static void SetStrobeDark(bool dark, bool sync)
+        {
+            if (_strobeDark == dark) return;
+            _strobeDark = dark;
+            Apply(sync);
         }
 
         public static void OnLobbyStart()
@@ -141,6 +155,7 @@ namespace HostRules
         // What CrewLightMod must be right now (null = the host's own slider value).
         private static float? Target()
         {
+            if (_strobeDark) return Darkest;
             if (_dark && _light.HasValue) return Sendable(_light.Value * DarkRatio());
             if (_value.HasValue) return Sendable(_value.Value);
             return null;
@@ -241,6 +256,7 @@ namespace HostRules
             _light = null;
             _saved = null;
             _dark = false;
+            _strobeDark = false;
             _sabotaged = false;
             _syncAtLobby = false;
         }

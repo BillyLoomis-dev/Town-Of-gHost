@@ -30,12 +30,23 @@ namespace HostRules
     //    more about 1 s later, in case a player's game dropped the first one.
     //  - Meetings: the real names go out the moment a body is reported or the button is pressed, before the meeting
     //    screen is built (its voting cards keep the names they were built with).
+    //  - Every hidden name is sent once more 2 s later (comms going down, and after a meeting), in case a player's
+    //    game missed the first one or got an older message after it.
+    //  - Like Town of Host, the hidden names are also sent again a moment after a kill, a finished task or a shapeshift
+    //    (after its animation); events close together share one send.
+    //  - A shapeshifter who turns back to himself during comms gets his grey look and hidden name sent again.
+    //  - Shapeshifting into a dead player (or anyone who isn't grey) during comms is refused, so nobody shows up with
+    //    a real look; if one gets through anyway, he is quietly turned back after the animation.
     internal static class CommsCamo
     {
         private const byte Gray = 15;
 
         private const int PlayersPerFrame = 3;
         private const double ConfirmSeconds = 1.0;           // looks are sent once more after this
+        private const double NameAgainSeconds = 2.0;         // hidden names are sent once more after this
+        public const double EventDelaySeconds = 0.5;         // kill, finished task, shapeshift without animation
+        public const double AnimationDelaySeconds = 1.2;     // shapeshift with animation
+        private const double TurnBackAnimatedSeconds = 1.5;  // a refused-too-late shapeshift is turned back after this
         private const double ReportTimeoutSeconds = 8;       // a report that never became a meeting
         private const double PartnerResendSeconds = 1.5;
         private const double PrivateNameDelaySeconds = 0.25; // private names go out after the shared ones
@@ -57,6 +68,9 @@ namespace HostRules
         private static readonly HashSet<byte> Grey = new HashSet<byte>();     // players showing the grey look now
         private static readonly HashSet<byte> Restore = new HashSet<byte>();  // grey players whose real look is due
         private static readonly Dictionary<byte, DateTime> Confirm = new Dictionary<byte, DateTime>(); // look re-sent then
+        private static readonly HashSet<byte> NameAgain = new HashSet<byte>();  // hidden name to send once more
+        private static DateTime _nameAgainAt;
+        private static readonly Dictionary<byte, DateTime> TurnBack = new Dictionary<byte, DateTime>(); // shapeshifter to turn back then
 
         private static bool _started;     // this round was set up
         private static bool _rule;        // /comms was on when this round started
@@ -84,6 +98,8 @@ namespace HostRules
             Grey.Clear();
             Restore.Clear();
             Confirm.Clear();
+            NameAgain.Clear();
+            TurnBack.Clear();
             Looks.Reset();
             _started = false;
             _rule = false;
@@ -211,6 +227,8 @@ namespace HostRules
             if (_on)
             {
                 GreyMore();
+                TurnBackDue(now);
+                HiddenNamesAgain(now);
                 Partners(now);
             }
             else DrainRestores(false);
@@ -260,6 +278,8 @@ namespace HostRules
         private static void End()
         {
             _on = false;
+            NameAgain.Clear();
+            TurnBack.Clear();
             foreach (var id in Grey) Restore.Add(id);
             Plugin.L.LogInfo("[comms] communications are fixed: real looks are coming back");
         }
@@ -281,6 +301,104 @@ namespace HostRules
             if (n > 0) PrivateNamesSoon();
         }
 
+        private static void NameAgainLater(byte id)
+        {
+            NameAgain.Add(id);
+            _nameAgainAt = DateTime.UtcNow.AddSeconds(NameAgainSeconds);
+        }
+
+        // ---------------------------------------------------------------- kills, tasks, shapeshifts
+
+        // Something happened (a kill, a finished task, a shapeshift): send the hidden names again a moment later.
+        // A send that's already planned is kept; only a shapeshift (mustWait) may move it later, after its animation.
+        public static void OnEvent(double delay, bool mustWait)
+        {
+            if (!_rule || _final || !_on || _inMeeting || _namesShown || Grey.Count == 0) return;
+            var at = DateTime.UtcNow.AddSeconds(delay);
+            if (NameAgain.Count == 0 || (mustWait && at > _nameAgainAt)) _nameAgainAt = at;
+            foreach (var id in Grey) NameAgain.Add(id);
+        }
+
+        // During comms, may this shapeshift go ahead? Turning back is always allowed; becoming a dead player or anyone
+        // who isn't grey is refused, so nobody shows up with a real look.
+        public static bool RefuseShapeshift(PlayerControl shapeshifter, PlayerControl target)
+        {
+            if (!_rule || _final || !_on || shapeshifter == null || target == null) return false;
+            if (target.PlayerId == shapeshifter.PlayerId) return false;
+            var td = target.Data;
+            return td == null || td.IsDead || td.Disconnected || !Grey.Contains(target.PlayerId);
+        }
+
+        // A shapeshift (or turning back) just happened.
+        public static void OnShapeshift(PlayerControl pc, PlayerControl target, bool animate)
+        {
+            if (!_rule || _final || !_on || _inMeeting || pc == null || target == null) return;
+            var d = pc.Data;
+            if (d == null || d.IsDead || d.Disconnected) return;
+
+            double delay = animate ? AnimationDelaySeconds : EventDelaySeconds;
+            var now = DateTime.UtcNow;
+
+            if (target.PlayerId == pc.PlayerId)
+            {
+                // Turned back to himself: his own look is grey; send it (and his hidden name) again to be sure.
+                TurnBack.Remove(pc.PlayerId);
+                if (Grey.Contains(pc.PlayerId)) Confirm[pc.PlayerId] = now.AddSeconds(delay);
+            }
+            else if (RefuseShapeshift(pc, target))
+            {
+                // Got through anyway: turn him back once the animation is over.
+                TurnBack[pc.PlayerId] = now.AddSeconds(animate ? TurnBackAnimatedSeconds : EventDelaySeconds);
+                Plugin.L.LogInfo("[comms] a shapeshift into a player who isn't grey: turning him back");
+            }
+            OnEvent(delay, true);
+        }
+
+        private static void TurnBackDue(DateTime now)
+        {
+            if (TurnBack.Count == 0) return;
+            foreach (var id in new List<byte>(TurnBack.Keys))
+            {
+                if (now < TurnBack[id]) continue;
+                TurnBack.Remove(id);
+                var pc = Find(id);
+                var d = pc != null ? pc.Data : null;
+                if (d == null || d.IsDead || d.Disconnected) continue;
+                try
+                {
+                    if (pc.CurrentOutfitType == PlayerOutfitType.Shapeshifted) pc.RpcShapeshift(pc, false);
+                }
+                catch (Exception e)
+                {
+                    Plugin.L.LogWarning("[comms] could not turn a shapeshifter back: " + e.Message);
+                }
+            }
+        }
+
+        // 2 s after names were hidden: the hidden names once more (only once), then the private names again.
+        private static void HiddenNamesAgain(DateTime now)
+        {
+            if (NameAgain.Count == 0 || _namesShown || now < _nameAgainAt) return;
+            var pcs = new List<PlayerControl>();
+            var names = new List<string>();
+            foreach (var id in NameAgain)
+            {
+                var pc = Find(id);
+                Look l;
+                if (pc == null || !Grey.Contains(id) || !Real.TryGetValue(id, out l)) continue;
+                var d = pc.Data;
+                if (d == null || d.IsDead || d.Disconnected) continue;
+                pcs.Add(pc);
+                names.Add(Hidden(l.Name));
+            }
+            NameAgain.Clear();
+            if (pcs.Count == 0) return;
+            try { Looks.SendNames(pcs, names); }
+            catch (Exception e) { Plugin.L.LogWarning("[comms] could not send the hidden names again: " + e.Message); }
+            PrivateNamesSoon();
+            Plugin.L.LogInfo("[comms] hidden names sent once more (" + pcs.Count + ")");
+        }
+
         // Shared names were just sent: the private ones (impostor partners, the Jester's tag) go out again shortly
         // after, so they arrive last and stay.
         private static void PrivateNamesSoon()
@@ -300,6 +418,7 @@ namespace HostRules
                 if (pc.CurrentOutfitType == PlayerOutfitType.Shapeshifted) pc.RpcShapeshift(pc, false);
                 Looks.Send(pc, Gray, Looks.NoHat, Looks.NoSkin, Looks.NoVisor, Looks.NoPet, Hidden(l.Name), true);
                 Confirm[pc.PlayerId] = DateTime.UtcNow.AddSeconds(ConfirmSeconds);
+                NameAgainLater(pc.PlayerId);
             }
             catch (Exception e)
             {
@@ -433,6 +552,7 @@ namespace HostRules
 
         private static void ShowRealNames(string why)
         {
+            NameAgain.Clear();
             if (_namesShown || Grey.Count == 0) return;
             var pcs = new List<PlayerControl>();
             var names = new List<string>();
@@ -470,6 +590,7 @@ namespace HostRules
                 if (d == null || d.IsDead || d.Disconnected) continue;
                 pcs.Add(pc);
                 names.Add(Hidden(l.Name));
+                NameAgainLater(id);
             }
             try { Looks.SendNames(pcs, names); }
             catch (Exception e) { Plugin.L.LogWarning("[comms] could not hide the names: " + e.Message); }
