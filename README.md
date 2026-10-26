@@ -18,13 +18,13 @@ Get them from the **[Releases](../../releases)** page:
 
 | File | What it is |
 |---|---|
-| **Town.Of.gHost.zip** | **Steam version** — ready to play. Extract and start the game. |
+| **Town-Of-gHost.zip** | **Steam version** — ready to play. Extract and start the game. |
 | **TownOfGHost.dll** | The plugin only, if you already have BepInEx 6 (IL2CPP) installed: put it in `BepInEx\plugins`. |
 | **Source code (zip)** | **Source code** — for building the mod yourself. |
 
 ### Install (Steam version)
 1. In Steam: right-click **Among Us → Manage → Browse local files**.
-2. Extract **Town.Of.gHost.zip** into that folder, next to `Among Us.exe`.
+2. Extract **Town-Of-gHost.zip** into that folder, next to `Among Us.exe`.
 3. Start the game. The **first launch is slower** while BepInEx sets itself up; after that it is normal.
 4. Create a lobby and type **`/help`** in the chat.
 
